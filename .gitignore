@@ -1,0 +1,27 @@
+# ---- Build output (scripts\build.ps1) ----
+/dist/
+*.exe
+*.test
+*.out
+
+# Generated Windows resources
+*.syso
+
+# ---- Runtime state created next to the executable ----
+/config.json
+/data/
+/logs/
+*.log
+tpm.pid
+
+# Downloaded Tor Expert Bundle (scripts\download-tor.ps1)
+/tor/
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store

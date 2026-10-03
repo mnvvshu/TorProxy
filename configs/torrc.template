@@ -1,0 +1,76 @@
+# =============================================================================
+# TorProxyManager - per-instance torrc template
+#
+# This file is rendered once per Tor instance on every start. Edit it to tune
+# Tor behaviour for ALL endpoints, then restart the proxies from the dashboard.
+#
+# Available placeholders (Go text/template syntax):
+#   {{.InstanceID}}   1-based instance number
+#   {{.SocksPort}}    first SOCKS5 port of this process's block
+#   {{.SocksPorts}}   list of ALL SOCKS5 ports served by this process
+#   {{.ControlPort}}  control port for this instance (control_port_start + n)
+#   {{.BindAddress}}  loopback bind address (from bind_address)
+#   {{.DataDir}}      private data directory for this instance (quoted)
+#   {{.LogFile}}      per-instance notice log (quoted)
+#   {{.GeoIPFile}}    GeoIP database found next to tor.exe (quoted, may be empty)
+#   {{.GeoIPv6File}}  GeoIPv6 database found next to tor.exe (quoted, may be empty)
+#
+# REQUIRED lines (the manager depends on them): SocksPort, ControlPort,
+# CookieAuthentication 1, DataDirectory, Log ... file {{.LogFile}}
+# =============================================================================
+
+# Instance {{.InstanceID}}  |  SOCKS {{.SocksPort}}  |  Control {{.ControlPort}}
+
+# SOCKS5 listeners - loopback only. One tor process serves a whole block of
+# ports; every port gets its own isolated circuits (and IsolateSOCKSAuth gives
+# each SOCKS username/password its own circuit too).
+{{range .SocksPorts}}SocksPort {{$.BindAddress}}:{{.}}
+{{end}}
+
+# Control port used for bootstrap monitoring, NEWNYM and graceful shutdown.
+# Authenticated with a per-instance cookie file; never exposed off-host.
+ControlPort 127.0.0.1:{{.ControlPort}}
+CookieAuthentication 1
+
+# Each instance MUST have its own data directory.
+DataDirectory {{.DataDir}}
+
+# Client-only operation: never relay or exit traffic for others.
+ClientOnly 1
+ExitRelay 0
+PublishServerDescriptor 0
+
+# Speed tuning for many parallel clients.
+MaxClientCircuitsPending 128
+CircuitBuildTimeout 40
+CircuitStreamTimeout 30
+NewCircuitPeriod 15
+AvoidDiskWrites 1
+
+# Scrub addresses from logs.
+SafeLogging 1
+
+# GeoIP databases (auto-detected from the Tor Expert Bundle / Tor Browser).
+{{if .GeoIPFile}}GeoIPFile {{.GeoIPFile}}
+{{end}}{{if .GeoIPv6File}}GeoIPv6File {{.GeoIPv6File}}
+{{end}}
+# --- Optional tuning (uncomment as needed) -----------------------------------
+# Warn when an application sends a raw IP instead of a hostname (DNS leak hint).
+# Use socks5h:// in your clients so DNS is resolved through Tor.
+#WarnUnsafeSocks 1
+#SafeSocks 1
+
+# Rotate circuits more or less often (seconds, default 600).
+#MaxCircuitDirtiness 600
+
+# Restrict exits to specific countries (requires GeoIP files next to tor.exe).
+#ExitNodes {us},{ca}
+#StrictNodes 1
+
+# Use bridges / pluggable transports (copy the lines from bridges.torproject.org).
+#UseBridges 1
+#ClientTransportPlugin obfs4 exec pluggable_transports\lyrebird.exe
+#Bridge obfs4 ...
+
+# Notice-level log, viewable per instance from the dashboard.
+Log notice file {{.LogFile}}

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TorProxyManager dashboard — manage hundreds of local Tor SOCKS5 endpoints, monitor health and bootstrap progress, and verify Tor routing.">
+    <meta name="color-scheme" content="dark">
+    <title>TorProxyManager — Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+    <!-- ============ Header ============ -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <defs>
+                            <linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#8B5CF6"/>
+                                <stop offset="100%" stop-color="#22D3EE"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="16" cy="16" r="14" stroke="url(#grad1)" stroke-width="2.5"/>
+                        <circle cx="16" cy="16" r="8" stroke="url(#grad1)" stroke-width="2" opacity="0.6"/>
+                        <circle cx="16" cy="16" r="3" fill="url(#grad1)"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>TorProxyManager</h1>
+                    <span class="version"><span id="app-version">v1.0.0</span> · <span id="tor-version">Tor —</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-badge" id="manager-state-badge" role="status" aria-live="polite">
+                <span class="status-dot"></span>
+                <span id="manager-state-text">Connecting…</span>
+            </div>
+            <div class="conn-indicator" id="conn-indicator" title="Live connection to TorProxyManager"></div>
+            <button class="btn btn-icon" id="btn-open-settings" data-action="open-settings" title="Settings" aria-label="Settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            </button>
+            <button class="btn btn-icon btn-icon-danger" id="btn-quit" data-action="quit" title="Quit TorProxyManager" aria-label="Quit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ============ Alerts ============ -->
+        <div class="alert hidden" id="alert-banner" role="alert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div class="alert-text" id="alert-text"></div>
+            <button class="btn btn-sm btn-ghost" id="alert-action" data-action="alert-action"></button>
+        </div>
+
+        <!-- ============ Stat cards ============ -->
+        <section class="dashboard" aria-label="Summary">
+            <div class="card stat-card">
+                <div class="stat-icon running"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="running-count">0</span>
+                    <span class="stat-label">Running · <span id="healthy-count">0</span> healthy</span>
+                </div>
+                <div class="stat-ring" id="running-ring" aria-hidden="true"></div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon starting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="starting-count">0</span>
+                    <span class="stat-label">Bootstrapping</span>
+                </div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon failed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6m0-6l6 6"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="failed-count">0</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon ports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value stat-value-sm" id="port-range">—</span>
+                    <span class="stat-label"><span id="total-count">0</span> SOCKS5 endpoints</span>
+                </div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon total"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value stat-value-sm" id="memory-total">0 MB</span>
+                    <span class="stat-label">Tor RAM · <span id="cpu-total">0%</span> CPU</span>
+                </div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-icon uptime"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                <div class="stat-info">
+                    <span class="stat-value stat-value-sm" id="uptime">—</span>
+                    <span class="stat-label">Uptime · avg start <span id="avg-startup">—</span></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ Startup progress ============ -->
+        <section class="progress-section hidden" id="progress-section" aria-label="Startup progress">
+            <div class="card">
+                <div class="progress-header">
+                    <span class="progress-label" id="progress-label">Starting endpoints…</span>
+                    <span class="progress-value" id="progress-text">0 / 0</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            </div>
+        </section>
+
+        <!-- ============ Controls ============ -->
+        <section class="controls" aria-label="Controls">
+            <div class="control-group">
+                <button class="btn btn-primary" id="btn-start" data-action="start-all">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Start All
+                </button>
+                <button class="btn btn-danger" id="btn-stop" data-action="stop-all">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                    Stop All
+                </button>
+                <button class="btn btn-secondary" id="btn-restart-failed" data-action="restart-failed">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Restart Failed
+                </button>
+                <button class="btn btn-secondary" id="btn-newnym-all" data-action="newnym-all" title="Request fresh circuits on every running endpoint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+                    New Identity
+                </button>
+                <button class="btn btn-secondary" id="btn-test-all" data-action="test-all" title="Verify every endpoint exits through Tor (check.torproject.org)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                    Verify Tor
+                </button>
+            </div>
+            <div class="control-group">
+                <button class="btn btn-ghost" id="btn-copy-proxies" data-action="copy-proxies" title="Copy all running endpoints to the clipboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    Copy Proxies
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-ghost" id="btn-export" data-action="toggle-export" aria-haspopup="true" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="dropdown-menu hidden" id="export-menu" role="menu">
+                        <a role="menuitem" id="export-proxies-txt" href="/api/proxies?download=1">Proxy list (host:port)</a>
+                        <a role="menuitem" id="export-proxies-url" href="/api/proxies?format=url&amp;download=1">Proxy list (socks5h:// URLs)</a>
+                        <div class="dropdown-sep"></div>
+                        <a role="menuitem" id="export-diag-json" href="/api/diagnostics/export?format=json">Diagnostics report (JSON)</a>
+                        <a role="menuitem" id="export-diag-text" href="/api/diagnostics/export?format=text">Diagnostics report (text)</a>
+                    </div>
+                </div>
+                <button class="btn btn-ghost" id="btn-browser" data-action="open-browser-modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                    Browser
+                </button>
+            </div>
+        </section>
+
+        <!-- ============ Tabs ============ -->
+        <section class="card table-card" aria-label="Endpoints and logs">
+            <div class="tabs" role="tablist">
+                <button class="tab active" role="tab" id="tab-endpoints" data-tab="endpoints" aria-selected="true">Endpoints <span class="tab-count" id="tab-endpoints-count">0</span></button>
+                <button class="tab" role="tab" id="tab-logs" data-tab="logs" aria-selected="false">Activity Log <span class="tab-count" id="tab-logs-count">0</span></button>
+                <div class="tabs-spacer"></div>
+                <div class="view-toggle" id="view-toggle" role="group" aria-label="View mode">
+                    <button class="view-btn active" id="view-table" data-view="table" title="Table view">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+                    </button>
+                    <button class="view-btn" id="view-grid" data-view="grid" title="Heatmap view">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Endpoints panel -->
+            <div class="tab-panel" id="panel-endpoints" role="tabpanel" aria-labelledby="tab-endpoints">
+                <div class="table-header">
+                    <div class="chips" id="state-filter" role="group" aria-label="Filter by state">
+                        <button class="chip active" data-filter="all">All</button>
+                        <button class="chip" data-filter="running"><span class="dot dot-running"></span>Running</button>
+                        <button class="chip" data-filter="bootstrapping"><span class="dot dot-starting"></span>Starting</button>
+                        <button class="chip" data-filter="failed"><span class="dot dot-failed"></span>Failed</button>
+                        <button class="chip" data-filter="stopped"><span class="dot dot-stopped"></span>Stopped</button>
+                    </div>
+                    <div class="table-search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="search" id="search-input" placeholder="Filter by port, IP or error…" aria-label="Filter endpoints">
+                    </div>
+                </div>
+
+                <div class="table-container" id="table-container">
+                    <table id="instances-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="id">#</th>
+                                <th class="sortable" data-sort="port">Endpoint</th>
+                                <th class="sortable" data-sort="state">State</th>
+                                <th>Bootstrap</th>
+                                <th class="sortable" data-sort="health">Health</th>
+                                <th class="sortable" data-sort="exit">Exit IP</th>
+                                <th class="sortable num" data-sort="mem">RAM</th>
+                                <th class="sortable num" data-sort="startup">Startup</th>
+                                <th>Last Error</th>
+                                <th class="actions-col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instances-tbody"></tbody>
+                    </table>
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-orb" aria-hidden="true"></div>
+                        <h3 id="empty-title">No endpoints running</h3>
+                        <p id="empty-text">Press <strong>Start All</strong> to launch your Tor SOCKS5 endpoints.</p>
+                    </div>
+                </div>
+
+                <div class="heatmap hidden" id="heatmap" aria-label="Endpoint heatmap"></div>
+                <div class="heatmap-legend hidden" id="heatmap-legend">
+                    <span><i class="hm-running"></i>Running</span>
+                    <span><i class="hm-bootstrapping"></i>Bootstrapping</span>
+                    <span><i class="hm-unhealthy"></i>Unhealthy</span>
+                    <span><i class="hm-failed"></i>Failed</span>
+                    <span><i class="hm-stopped"></i>Stopped</span>
+                </div>
+            </div>
+
+            <!-- Logs panel -->
+            <div class="tab-panel hidden" id="panel-logs" role="tabpanel" aria-labelledby="tab-logs">
+                <div class="table-header">
+                    <div class="chips" id="log-level-filter" role="group" aria-label="Filter by level">
+                        <button class="chip active" data-level="ALL">All</button>
+                        <button class="chip" data-level="INFO">Info</button>
+                        <button class="chip" data-level="WARN"><span class="dot dot-starting"></span>Warnings</button>
+                        <button class="chip" data-level="ERROR"><span class="dot dot-failed"></span>Errors</button>
+                    </div>
+                    <div class="log-tools">
+                        <label class="switch-inline"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
+                        <div class="table-search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="search" id="log-search" placeholder="Search log…" aria-label="Search log">
+                        </div>
+                        <button class="btn btn-sm btn-ghost" id="btn-clear-logs" data-action="clear-logs">Clear view</button>
+                    </div>
+                </div>
+                <div class="log-view" id="log-view" aria-live="off"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <span>Bound to <code>127.0.0.1</code> only · Use <code>socks5h://</code> so DNS resolves through Tor</span>
+        <span id="footer-tor-path"></span>
+    </footer>
+</div>
+
+<!-- ============ Instance drawer ============ -->
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="drawer-title">
+    <div class="drawer-header">
+        <div>
+            <h2 id="drawer-title">Endpoint</h2>
+            <code id="drawer-endpoint" class="drawer-endpoint"></code>
+        </div>
+        <button class="btn btn-icon" data-action="close-drawer" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="drawer-body">
+        <div class="drawer-actions" id="drawer-actions">
+            <button class="btn btn-sm btn-secondary" data-inst-action="test">Verify Tor</button>
+            <button class="btn btn-sm btn-secondary" data-inst-action="newnym">New Identity</button>
+            <button class="btn btn-sm btn-secondary" data-inst-action="restart">Restart</button>
+            <button class="btn btn-sm btn-secondary" data-inst-action="toggle">Stop</button>
+            <button class="btn btn-sm btn-secondary" data-inst-action="browser">Open Browser</button>
+            <button class="btn btn-sm btn-ghost" data-inst-action="copy">Copy</button>
+        </div>
+        <dl class="kv" id="drawer-kv"></dl>
+        <div class="drawer-log-header">
+            <h3>Tor log</h3>
+            <button class="btn btn-sm btn-ghost" data-action="refresh-instance-log">Refresh</button>
+        </div>
+        <pre class="tor-log" id="drawer-log">—</pre>
+    </div>
+</aside>
+<div class="drawer-scrim" id="drawer-scrim" data-action="close-drawer"></div>
+
+<!-- ============ Settings modal ============ -->
+<div class="modal-overlay hidden" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <div>
+                <h2 id="settings-title">Configuration</h2>
+                <span class="modal-sub" id="settings-file"></span>
+            </div>
+            <button class="btn btn-icon" data-action="close-settings" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <form class="modal-body" id="settings-form" novalidate>
+            <div class="range-preview" id="range-preview">
+                <div><span class="rp-label">SOCKS5</span><span class="rp-value" id="rp-socks">—</span></div>
+                <div><span class="rp-label">Control</span><span class="rp-value" id="rp-control">—</span></div>
+                <div><span class="rp-label">Est. RAM</span><span class="rp-value" id="rp-ram">—</span></div>
+            </div>
+
+            <fieldset class="form-section">
+                <legend>Endpoints</legend>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="cfg-start-port">Starting SOCKS port</label>
+                        <input type="number" id="cfg-start-port" data-key="start_port" data-type="int" min="1024" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-endpoint-count">Endpoint count <span class="hint">1 – 500</span></label>
+                        <input type="number" id="cfg-endpoint-count" data-key="endpoint_count" data-type="int" min="1" max="500">
+                        <input type="range" id="cfg-endpoint-slider" min="1" max="500" step="1" aria-label="Endpoint count slider">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-tor-processes">Tor processes <span class="hint">1 – 64 (fewer = lighter on your PC)</span></label>
+                        <input type="number" id="cfg-tor-processes" data-key="tor_processes" data-type="int" min="1" max="64">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-control-port">Control port start</label>
+                        <input type="number" id="cfg-control-port" data-key="control_port_start" data-type="int" min="1024" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-web-port">Dashboard port</label>
+                        <input type="number" id="cfg-web-port" data-key="web_ui_port" data-type="int" min="1024" max="65535">
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend>Tor</legend>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="cfg-tor-path">Tor executable <span class="hint">auto-detected when empty</span></label>
+                        <input type="text" id="cfg-tor-path" data-key="tor_executable_path" placeholder="C:\TorProxyManager\tor\tor.exe" spellcheck="false">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="cfg-torrc-template">torrc template <span class="hint">uses configs\torrc.template or built-in when empty</span></label>
+                        <input type="text" id="cfg-torrc-template" data-key="torrc_template_path" spellcheck="false">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="cfg-data-dir">Data directory <span class="hint">defaults to .\data</span></label>
+                        <input type="text" id="cfg-data-dir" data-key="data_directory" spellcheck="false">
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend>Startup &amp; recovery</legend>
+                <div class="form-grid form-grid-3">
+                    <div class="form-group">
+                        <label for="cfg-concurrency">Parallel startups</label>
+                        <input type="number" id="cfg-concurrency" data-key="startup_concurrency" data-type="int" min="1" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-timeout">Port timeout (s)</label>
+                        <input type="number" id="cfg-timeout" data-key="connection_timeout_seconds" data-type="int" min="5" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-bootstrap-timeout">Bootstrap timeout (s)</label>
+                        <input type="number" id="cfg-bootstrap-timeout" data-key="bootstrap_timeout_seconds" data-type="int" min="30" max="3600">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-health-interval">Health check every (s)</label>
+                        <input type="number" id="cfg-health-interval" data-key="health_check_interval_seconds" data-type="int" min="10" max="3600">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-retry-limit">Retry limit</label>
+                        <input type="number" id="cfg-retry-limit" data-key="retry_limit" data-type="int" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-retry-backoff">Initial backoff (s)</label>
+                        <input type="number" id="cfg-retry-backoff" data-key="retry_backoff_seconds" data-type="int" min="1" max="60">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-retry-mult">Backoff multiplier</label>
+                        <input type="number" id="cfg-retry-mult" data-key="retry_backoff_multiplier" data-type="float" min="1" max="10" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-retry-max">Max backoff (s)</label>
+                        <input type="number" id="cfg-retry-max" data-key="retry_max_backoff_seconds" data-type="int" min="1" max="3600">
+                    </div>
+                </div>
+                <div class="toggles">
+                    <label class="switch"><input type="checkbox" id="cfg-auto-restart" data-key="auto_restart" data-type="bool"><span class="slider"></span><span>Auto-restart crashed endpoints</span></label>
+                    <label class="switch"><input type="checkbox" id="cfg-seed-cache" data-key="seed_directory_cache" data-type="bool"><span class="slider"></span><span>Share directory cache between instances (much faster startup)</span></label>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend>Application</legend>
+                <div class="toggles">
+                    <label class="switch"><input type="checkbox" id="cfg-auto-start" data-key="auto_start" data-type="bool"><span class="slider"></span><span>Start all endpoints when the app launches</span></label>
+                    <label class="switch"><input type="checkbox" id="cfg-start-windows" data-key="start_with_windows" data-type="bool"><span class="slider"></span><span>Launch TorProxyManager when I sign in to Windows</span></label>
+                    <label class="switch"><input type="checkbox" id="cfg-open-dashboard" data-key="open_dashboard_on_launch" data-type="bool"><span class="slider"></span><span>Open this dashboard on launch</span></label>
+                    <label class="switch"><input type="checkbox" id="cfg-enable-tray" data-key="enable_tray" data-type="bool"><span class="slider"></span><span>Show system tray icon</span></label>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="cfg-browser-path">Browser for "Open Browser" <span class="hint">Firefox, Chrome, Edge or Brave</span></label>
+                        <input type="text" id="cfg-browser-path" data-key="browser_path" list="browser-list" placeholder="Auto-detect" spellcheck="false">
+                        <datalist id="browser-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-log-level">Log level</label>
+                        <select id="cfg-log-level" data-key="log_level">
+                            <option value="debug">Debug</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-log-size">Log file size (MB) / files kept</label>
+                        <div class="input-pair">
+                            <input type="number" id="cfg-log-size" data-key="log_max_size_mb" data-type="int" min="1" max="100">
+                            <input type="number" id="cfg-log-files" data-key="log_max_files" data-type="int" min="1" max="50" aria-label="Log files kept">
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="form-errors hidden" id="settings-errors" role="alert"></div>
+
+            <div class="modal-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                <p>Endpoint and Tor changes apply the next time endpoints are started. All SOCKS ports are bound to <code>127.0.0.1</code>; port ranges are validated for overlaps and conflicts.</p>
+            </div>
+        </form>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="reset-defaults">Reset to defaults</button>
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" data-action="close-settings">Cancel</button>
+            <button class="btn btn-primary" id="btn-save-config" data-action="save-config">Save Configuration</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Browser modal ============ -->
+<div class="modal-overlay hidden" id="browser-modal" role="dialog" aria-modal="true" aria-labelledby="browser-title">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h2 id="browser-title">Browse through Tor</h2>
+            <button class="btn btn-icon" data-action="close-browser-modal" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="browser-port">SOCKS5 endpoint</label>
+                <select id="browser-port"></select>
+            </div>
+            <div class="browser-info">
+                <div class="copy-field"><span>Host</span><code id="browser-host">127.0.0.1</code></div>
+                <div class="copy-field"><span>Port</span><code id="browser-port-display">9050</code></div>
+                <div class="copy-field"><span>Type</span><code>SOCKS v5 · remote DNS</code></div>
+                <div class="copy-field"><span>Browser</span><code id="browser-name">Auto-detect</code></div>
+            </div>
+            <div class="modal-note warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <p><strong>Privacy note:</strong> the browser opens with an isolated profile that resolves DNS through Tor and disables WebRTC, but regular browsers are fingerprintable. For strong anonymity use the official <a href="https://www.torproject.org/download/" target="_blank" rel="noopener noreferrer">Tor Browser</a>.</p>
+            </div>
+            <button class="btn btn-primary full-width" id="btn-launch-browser" data-action="launch-browser">Launch Browser</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Confirm dialog ============ -->
+<div class="modal-overlay hidden" id="confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="modal modal-sm">
+        <div class="modal-header"><h2 id="confirm-title">Are you sure?</h2></div>
+        <div class="modal-body"><p class="confirm-text" id="confirm-text"></p></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+            <button class="btn btn-danger-solid" id="confirm-ok">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

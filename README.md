@@ -1,4 +1,12 @@
-# TorProxyManager
+<p align="center">
+  <img src="assets/logo.png" alt="TorProxyManager Logo" width="128" height="128" />
+</p>
+
+<h1 align="center">TorProxyManager</h1>
+
+<p align="center">
+  <b>Supervise a pool of independent Tor SOCKS5 proxy endpoints on Windows</b>
+</p>
 
 **TorProxyManager.exe** runs and supervises a pool of independent Tor processes on Windows. Each process exposes its own local SOCKS5 endpoint:
 
